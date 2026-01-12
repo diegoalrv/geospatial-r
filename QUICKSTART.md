@@ -451,36 +451,6 @@ list.files("outputs/", pattern = ".png")  # Debe mostrar 9 mapas
 list.files("outputs/", pattern = ".csv")  # Debe mostrar 6 tablas
 ```
 
----
-
-## 💡 Tips para Presentación en Clase
-
-### Orden Recomendado de Visualización
-
-**Introducción (5 min)**
-1. Mostrar `00_validacion_cobertura.png` - "Esto es lo que tenemos"
-2. Mostrar `00_estado_datasets.csv` - "Así validamos la calidad"
-
-**Demo 1 (15 min)**
-1. Mostrar `01_mapa_validacion_puntos.png` - "Puntos con sus zonas"
-2. Comparar `01_mapa_conteo_eventos.png` vs `01_mapa_tasa_eventos.png` 
-   - "¿Cambia la historia?"
-3. Abrir `01_resumen_por_zona.csv` - "Los números detrás del mapa"
-
-**Demo 2 (15 min)**
-1. Mostrar `02_mapa_buffers_proximidad.png` - "Áreas de cobertura"
-2. Mostrar `02_grafico_sensibilidad.png` - "¿Más distancia = proporcionalmente más cobertura?"
-3. Abrir `02_ranking_hospitales_500m.csv` - "¿Qué hospitales están saturados?"
-
-**Demo 3 (20 min)**
-1. Mostrar `03_secuencia_agregacion.png` - "Del punto a la agregación"
-2. Mostrar `03_comparacion_agregaciones.png` - "Mismos datos, diferente historia"
-3. Mostrar `03_histograma_comparativo.png` - "Distribuciones distintas"
-4. Abrir `03_comparacion_estadisticas.csv` - "Números que lo confirman"
-
-**Cierre (5 min)**
-- Discusión abierta sobre elección de métodos
-- Q&A
 
 ---
 
