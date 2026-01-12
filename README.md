@@ -12,15 +12,6 @@ Este repositorio contiene scripts completos y reproducibles para una clase de an
 4. **03_demo_scale_aggregation.R** - Agregación espacial y MAUP
 5. **99_helpers_optional.R** - Funciones auxiliares (opcional)
 
-### Estructura de Directorios
-
-```
-proyecto/
-├── scripts/           # Scripts de R
-├── data/             # Datos de entrada y objetos procesados
-└── outputs/          # Figuras y tablas generadas
-```
-
 ## 🎯 Objetivos Pedagógicos
 
 ### Demo 00: Setup y Sanity Checks
@@ -289,23 +280,146 @@ objeto_limpio <- st_make_valid(objeto)
 # Solución: Revisar directorio outputs/
 list.files("outputs/", pattern = ".png")
 ```
+## 🌍 Datos de Fuentes Abiertas (Open Data)
 
-## 📝 Notas para el Instructor
+Además de los datos simulados incluidos en este repositorio, puedes ejecutar estos scripts con datasets reales descargables gratuitamente (Chile + global). Abajo tienes fuentes confiables y comunes en investigación aplicada.
 
-### Tiempos Sugeridos (clase de 2-3 horas)
+**Recomendación**: descarga datos en formatos GeoJSON / Shapefile / CSV, y siempre verifica su CRS.
 
-- **15 min**: Introducción y setup (Demo 00)
-- **30 min**: CSV a sf y join espacial (Demo 01)
-- **30 min**: Análisis de proximidad (Demo 02)
-- **30 min**: MAUP y agregación (Demo 03)
-- **15 min**: Discusión y preguntas
+### 🇨🇱 Datos Abiertos Chile
 
-### Puntos de Pausa para Discusión
+#### 1) IDE Chile (Infraestructura de Datos Espaciales)
 
-1. Después de Demo 00: "¿Qué problemas encontrarían con sus datos reales?"
-2. Después de Demo 01: "¿Por qué preferirían tasa vs conteo?"
-3. Después de Demo 02: "¿Qué distancia elegirían y por qué?"
-4. Después de Demo 03: "¿Qué unidad usarían para tomar decisiones?"
+Portal oficial con capas GIS (administrativas, ambientales, hidrografía, etc.).
+
+🔗 https://www.ide.cl/
+
+**Útil para**:
+- Límites comunales/regionales
+- Cartografía base
+- Capas institucionales (según disponibilidad)
+
+#### 2) Datos Abiertos Gobierno de Chile
+
+Portal general de datos abiertos (tabulares + espaciales).
+
+🔗 https://www.datos.gob.cl/
+
+**Útil para**:
+- Indicadores comunales
+- Catastros, equipamientos, estadísticas
+- Datasets CSV para joins espaciales
+
+#### 3) BCNE (Biblioteca del Congreso Nacional)
+
+Muy usado para divisiones político-administrativas + cartografía.
+
+🔗 https://www.bcn.cl/siit/mapas_vectoriales
+
+**Útil para**:
+- Comunas / regiones / provincias en vectores
+
+#### 4) INE (Instituto Nacional de Estadísticas)
+
+Principalmente datos tabulares (ideal para joins por comuna/zona).
+
+🔗 https://www.ine.gob.cl/
+
+**Útil para**:
+- Población por comuna
+- Series temporales
+
+### 🌐 Datos Abiertos Globales
+
+#### 1) OpenStreetMap (OSM)
+
+La fuente más importante del mundo para datos geográficos abiertos.
+
+🔗 https://www.openstreetmap.org/  
+🔗 Extractos (recomendado): https://download.geofabrik.de/
+
+**Útil para**:
+- Calles, edificios, puntos de interés (POIs)
+- Hospitales, escuelas, paraderos
+- Redes de transporte
+
+#### 2) Overpass Turbo (consulta OSM sin descargar todo)
+
+Permite descargar puntos/POIs directamente desde OSM con query.
+
+🔗 https://overpass-turbo.eu/
+
+**Ejemplos de uso**:
+- Hospitales de una ciudad
+- Estaciones de metro
+- Colegios
+
+#### 3) Natural Earth (vectores listos para usar)
+
+Muy usado en clases y demos por su calidad.
+
+🔗 https://www.naturalearthdata.com/
+
+**Útil para**:
+- Países, regiones, costas
+- Datasets globales livianos
+
+#### 4) GADM (límites administrativos globales)
+
+Límites administrativos por país (nivel 0/1/2/3…).
+
+🔗 https://gadm.org/
+
+**Útil para**:
+- Límites administrativos en cualquier país
+
+#### 5) Open Data de WorldPop (población gridded)
+
+Raster/población espacial.
+
+🔗 https://www.worldpop.org/
+
+**Útil para**:
+- Tasas por población
+- Exposición y densidad poblacional
+
+#### 6) Copernicus (Sentinel)
+
+Satélite e imágenes para análisis ambiental/territorial.
+
+🔗 https://dataspace.copernicus.eu/
+
+**Útil para**:
+- NDVI, cobertura vegetacional
+- Cambios de suelo
+
+### 🚍 Transporte (GTFS)
+
+**GTFS Static**: Datos de transporte público en formato estándar.
+
+🔗 https://gtfs.org/  
+🔗 Catálogo global: https://transitfeeds.com/  
+🔗 Catálogo alternativo: https://mobilitydatabase.org/
+
+**Útil para**:
+- Paraderos, rutas, horarios
+- Análisis de accesibilidad
+
+### 🧪 Recomendación de Datasets por Demo
+
+#### Demo 01 (CSV → sf + join espacial)
+- **Dataset CSV**: eventos con lat/lon (accidentes, delitos, reclamos, etc.)
+- **Polígonos**: comunas/barrios/zonas censales (BCNE, IDE)
+
+#### Demo 02 (Buffers)
+- **Puntos de equipamiento**: hospitales/colegios/centros de salud (OSM via Overpass)
+- **Eventos**: puntos (CSV)
+- Buffers y ranking por exposición
+
+#### Demo 03 (MAUP)
+Usar eventos georreferenciados y comparar:
+- Agregación administrativa (comunas/zonas)
+- Grillas uniformes (hexágonos)
 
 ### Extensiones Posibles
 
@@ -322,6 +436,7 @@ Material educativo de libre uso. Atribución apreciada pero no requerida.
 ## 📧 Contacto
 
 Para preguntas, sugerencias o reportar errores en los scripts.
+d.alexis.ramirez at gmail dot com
 
 ---
 

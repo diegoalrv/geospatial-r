@@ -1,59 +1,74 @@
 # =============================================================================
 # 99_helpers_optional.R
-# Análisis Geoespacial en R - Funciones Auxiliares
+# Análisis Geoespacial en R - Funciones Auxiliares (Opcional)
 # =============================================================================
-# Objetivo: Funciones de utilidad para simplificar tareas comunes en análisis
-# geoespacial y mantener código limpio en los demos principales
+# Objetivo:
+# - Reunir helpers para simplificar tareas comunes en análisis geoespacial
+# - Mantener los scripts demo limpios y consistentes
 # =============================================================================
-
-library(sf)
-library(dplyr)
-library(units)
 
 # -----------------------------------------------------------------------------
-# 1. FUNCIÓN: REPORTE RÁPIDO DE OBJETO SF
+# 0. CONFIGURACIÓN INICIAL
+# -----------------------------------------------------------------------------
+
+# Carpeta de trabajo = carpeta del script activo (RStudio)
+if (requireNamespace("rstudioapi", quietly = TRUE) &&
+    rstudioapi::isAvailable()) {
+  setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+}
+
+suppressPackageStartupMessages({
+  library(sf)
+  library(dplyr)
+  library(units)
+  library(ggplot2)
+})
+
+# -----------------------------------------------------------------------------
+# 1. REPORTE RÁPIDO DE OBJETO SF
 # -----------------------------------------------------------------------------
 
 #' Genera un reporte rápido de un objeto sf
-#' 
+#'
 #' @param sf_obj Objeto sf a reportar
 #' @param name Nombre del objeto (para el título del reporte)
 #' @return Imprime información en consola, devuelve invisible(NULL)
 #' @examples
 #' reporte_sf(poligonos, "Polígonos administrativos")
 reporte_sf <- function(sf_obj, name = "Objeto sf") {
-  
-  # Validar que es un objeto sf
+
+  # Validación
   if (!inherits(sf_obj, "sf")) {
     stop("El objeto no es de clase 'sf'")
   }
-  
+
   cat("\n", rep("=", 60), "\n", sep = "")
   cat("REPORTE:", name, "\n")
   cat(rep("=", 60), "\n\n", sep = "")
-  
-  # Información básica
+
+  # Info básica
   cat("📊 ESTRUCTURA:\n")
   cat("  - Clase:", paste(class(sf_obj), collapse = ", "), "\n")
   cat("  - N° registros:", nrow(sf_obj), "\n")
   cat("  - N° columnas:", ncol(sf_obj), "\n")
   cat("  - Tipo geometría:", st_geometry_type(sf_obj, by_geometry = FALSE), "\n")
-  
+
   # CRS
+  crs <- st_crs(sf_obj)
   cat("\n🌍 SISTEMA DE COORDENADAS:\n")
-  cat("  - EPSG:", st_crs(sf_obj)$epsg, "\n")
-  cat("  - Proj4string:", st_crs(sf_obj)$proj4string, "\n")
-  cat("  - Unidades:", st_crs(sf_obj)$units, "\n")
+  cat("  - EPSG:", crs$epsg, "\n")
+  cat("  - Input:", crs$input, "\n")
+  cat("  - Unidades:", crs$units, "\n")
   cat("  - Es geográfico:", st_is_longlat(sf_obj), "\n")
-  
+
   # BBox
   bbox <- st_bbox(sf_obj)
   cat("\n📍 BOUNDING BOX:\n")
-  cat("  - xmin:", round(bbox[1], 4), "\n")
-  cat("  - ymin:", round(bbox[2], 4), "\n")
-  cat("  - xmax:", round(bbox[3], 4), "\n")
-  cat("  - ymax:", round(bbox[4], 4), "\n")
-  
+  cat("  - xmin:", round(bbox["xmin"], 4), "\n")
+  cat("  - ymin:", round(bbox["ymin"], 4), "\n")
+  cat("  - xmax:", round(bbox["xmax"], 4), "\n")
+  cat("  - ymax:", round(bbox["ymax"], 4), "\n")
+
   # Validez geométrica
   cat("\n✓ VALIDACIÓN:\n")
   n_invalidos <- sum(!st_is_valid(sf_obj))
@@ -61,32 +76,36 @@ reporte_sf <- function(sf_obj, name = "Objeto sf") {
   if (n_invalidos > 0) {
     cat("  ⚠ Geometrías inválidas:", n_invalidos, "\n")
   }
-  
+
   # Columnas
   cat("\n📋 COLUMNAS:\n")
   cat("  ", paste(names(sf_obj), collapse = ", "), "\n")
-  
-  # Área (solo para polígonos)
-  if (st_geometry_type(sf_obj, by_geometry = FALSE) %in% c("POLYGON", "MULTIPOLYGON")) {
+
+  # Área (polígonos)
+  tipo_geom <- st_geometry_type(sf_obj, by_geometry = FALSE)
+  if (tipo_geom %in% c("POLYGON", "MULTIPOLYGON")) {
     areas <- st_area(sf_obj)
     cat("\n📐 ÁREA (para polígonos):\n")
     cat("  - Total:", round(sum(areas), 2), units(areas), "\n")
     cat("  - Promedio:", round(mean(areas), 2), units(areas), "\n")
-    cat("  - Rango: [", round(min(areas), 2), ",", round(max(areas), 2), "]", 
-        units(areas), "\n")
+    cat(
+      "  - Rango: [",
+      round(min(areas), 2), ",",
+      round(max(areas), 2), "]",
+      units(areas), "\n"
+    )
   }
-  
+
   cat("\n", rep("=", 60), "\n\n", sep = "")
-  
   invisible(NULL)
 }
 
 # -----------------------------------------------------------------------------
-# 2. FUNCIÓN: ESTANDARIZAR CRS
+# 2. ESTANDARIZAR CRS
 # -----------------------------------------------------------------------------
 
 #' Estandariza CRS de un objeto sf
-#' 
+#'
 #' @param sf_obj Objeto sf a transformar
 #' @param crs_target CRS objetivo (EPSG code o proj4string)
 #' @param verbose Mostrar mensajes (default TRUE)
@@ -94,89 +113,88 @@ reporte_sf <- function(sf_obj, name = "Objeto sf") {
 #' @examples
 #' poligonos_utm <- estandarizar_crs(poligonos, 32719)
 estandarizar_crs <- function(sf_obj, crs_target, verbose = TRUE) {
-  
-  # Validar
+
+  # Validación
   if (!inherits(sf_obj, "sf")) {
     stop("El objeto no es de clase 'sf'")
   }
-  
+
   crs_original <- st_crs(sf_obj)
-  
-  # Si ya está en el CRS objetivo, no hacer nada
-  if (crs_original == st_crs(crs_target)) {
-    if (verbose) {
-      cat("✓ Objeto ya está en CRS", crs_target, "\n")
-    }
+  crs_objetivo <- st_crs(crs_target)
+
+  # Si ya está en CRS objetivo
+  if (crs_original == crs_objetivo) {
+    if (verbose) cat("✓ Objeto ya está en CRS", crs_target, "\n")
     return(sf_obj)
   }
-  
-  # Transformar
+
+  # Transformación
   if (verbose) {
     cat("→ Transformando CRS:\n")
     cat("  - Origen:", crs_original$input, "\n")
-    cat("  - Destino:", crs_target, "\n")
+    cat("  - Destino:", crs_objetivo$input, "\n")
   }
-  
+
   sf_transformado <- st_transform(sf_obj, crs_target)
-  
-  if (verbose) {
-    cat("✓ Transformación completada\n")
-  }
-  
-  return(sf_transformado)
+
+  if (verbose) cat("✓ Transformación completada\n")
+  sf_transformado
 }
 
 # -----------------------------------------------------------------------------
-# 3. FUNCIÓN: GUARDAR FIGURAS CON NOMBRES CONSISTENTES
+# 3. GUARDAR FIGURAS CON NOMBRES CONSISTENTES
 # -----------------------------------------------------------------------------
 
 #' Guarda figuras con nombres y configuraciones consistentes
-#' 
+#'
 #' @param plot Objeto ggplot o plot base
 #' @param nombre Nombre base del archivo (sin extensión)
 #' @param directorio Directorio de salida (default "outputs")
 #' @param width Ancho en pulgadas (default 10)
 #' @param height Alto en pulgadas (default 8)
 #' @param dpi Resolución (default 300)
-#' @param formato Formato de salida (default "png", opciones: "png", "pdf", "jpg")
-#' @return Path completo del archivo guardado
+#' @param formato Formato de salida (default "png": "png", "pdf", "jpg")
+#' @return Path completo del archivo guardado (invisible)
 #' @examples
 #' guardar_figura(mi_mapa, "mapa_eventos", width = 12, height = 9)
-guardar_figura <- function(plot, nombre, directorio = "outputs", 
-                          width = 10, height = 8, dpi = 300, formato = "png") {
-  
-  # Crear directorio si no existe
-  if (!dir.exists(directorio)) {
-    dir.create(directorio, recursive = TRUE)
-  }
-  
-  # Construir path
+guardar_figura <- function(plot,
+                           nombre,
+                           directorio = "outputs",
+                           width = 10,
+                           height = 8,
+                           dpi = 300,
+                           formato = "png") {
+
+  # Directorio
+  if (!dir.exists(directorio)) dir.create(directorio, recursive = TRUE)
+
+  # Path
   timestamp <- format(Sys.time(), "%Y%m%d_%H%M%S")
   filename <- paste0(nombre, "_", timestamp, ".", formato)
   filepath <- file.path(directorio, filename)
-  
-  # Guardar según formato
-  if (formato == "png") {
-    ggplot2::ggsave(filepath, plot, width = width, height = height, dpi = dpi)
-  } else if (formato == "pdf") {
-    ggplot2::ggsave(filepath, plot, width = width, height = height)
-  } else if (formato == "jpg") {
-    ggplot2::ggsave(filepath, plot, width = width, height = height, dpi = dpi)
-  } else {
+
+  # Guardado
+  formatos_ok <- c("png", "pdf", "jpg")
+  if (!formato %in% formatos_ok) {
     stop("Formato no soportado. Usar 'png', 'pdf' o 'jpg'")
   }
-  
+
+  if (formato == "pdf") {
+    ggplot2::ggsave(filepath, plot, width = width, height = height)
+  } else {
+    ggplot2::ggsave(filepath, plot, width = width, height = height, dpi = dpi)
+  }
+
   cat("✓ Figura guardada:", filepath, "\n")
-  
-  return(invisible(filepath))
+  invisible(filepath)
 }
 
 # -----------------------------------------------------------------------------
-# 4. FUNCIÓN: PLANTILLA DE TEMA GRÁFICO CONSISTENTE
+# 4. PLANTILLA DE TEMA GRÁFICO CONSISTENTE
 # -----------------------------------------------------------------------------
 
 #' Tema ggplot2 consistente para mapas
-#' 
+#'
 #' @param base_size Tamaño base de la fuente (default 12)
 #' @param base_family Familia de fuente (default "")
 #' @return Tema ggplot2
@@ -186,10 +204,8 @@ tema_mapa <- function(base_size = 12, base_family = "") {
   ggplot2::theme_minimal(base_size = base_size, base_family = base_family) +
     ggplot2::theme(
       plot.title = ggplot2::element_text(face = "bold", size = base_size * 1.2),
-      plot.subtitle = ggplot2::element_text(size = base_size * 0.9, 
-                                            color = "gray30"),
-      plot.caption = ggplot2::element_text(size = base_size * 0.8, 
-                                          color = "gray50", hjust = 0),
+      plot.subtitle = ggplot2::element_text(size = base_size * 0.9, color = "gray30"),
+      plot.caption = ggplot2::element_text(size = base_size * 0.8, color = "gray50", hjust = 0),
       legend.position = "right",
       legend.title = ggplot2::element_text(face = "bold", size = base_size * 0.9),
       axis.text = ggplot2::element_blank(),
@@ -200,11 +216,11 @@ tema_mapa <- function(base_size = 12, base_family = "") {
 }
 
 # -----------------------------------------------------------------------------
-# 5. FUNCIÓN: VALIDAR Y LIMPIAR GEOMETRÍAS
+# 5. VALIDAR Y LIMPIAR GEOMETRÍAS
 # -----------------------------------------------------------------------------
 
 #' Valida y repara geometrías inválidas
-#' 
+#'
 #' @param sf_obj Objeto sf a validar
 #' @param reparar Si TRUE, intenta reparar geometrías inválidas (default TRUE)
 #' @param verbose Mostrar mensajes (default TRUE)
@@ -212,85 +228,76 @@ tema_mapa <- function(base_size = 12, base_family = "") {
 #' @examples
 #' poligonos_limpios <- validar_geometrias(poligonos)
 validar_geometrias <- function(sf_obj, reparar = TRUE, verbose = TRUE) {
-  
+
   if (!inherits(sf_obj, "sf")) {
     stop("El objeto no es de clase 'sf'")
   }
-  
-  # Verificar validez
+
   validas <- st_is_valid(sf_obj)
   n_invalidas <- sum(!validas)
-  
+
   if (verbose) {
     cat("→ Validando geometrías...\n")
     cat("  - Geometrías válidas:", sum(validas), "/", length(validas), "\n")
     cat("  - Geometrías inválidas:", n_invalidas, "\n")
   }
-  
-  # Si hay inválidas y se solicita reparar
+
   if (n_invalidas > 0 && reparar) {
-    if (verbose) {
-      cat("  → Reparando geometrías inválidas...\n")
-    }
-    
+    if (verbose) cat("  → Reparando geometrías inválidas...\n")
+
     sf_obj <- st_make_valid(sf_obj)
-    
-    # Verificar de nuevo
+
     validas_post <- st_is_valid(sf_obj)
     n_invalidas_post <- sum(!validas_post)
-    
+
     if (verbose) {
       cat("  ✓ Reparación completada\n")
       cat("  - Geometrías inválidas restantes:", n_invalidas_post, "\n")
     }
-    
+
     if (n_invalidas_post > 0) {
       warning("No se pudieron reparar todas las geometrías")
     }
   }
-  
-  return(sf_obj)
+
+  sf_obj
 }
 
 # -----------------------------------------------------------------------------
-# 6. FUNCIÓN: CALCULAR CENTROIDE DE POLÍGONOS
+# 6. CALCULAR CENTROIDES DE POLÍGONOS
 # -----------------------------------------------------------------------------
 
 #' Calcula centroides de polígonos
-#' 
+#'
 #' @param sf_obj Objeto sf de polígonos
 #' @param point_on_surface Si TRUE, garantiza punto dentro del polígono (default FALSE)
 #' @return Objeto sf con geometría POINT
 #' @examples
 #' centroides <- calcular_centroides(poligonos, point_on_surface = TRUE)
 calcular_centroides <- function(sf_obj, point_on_surface = FALSE) {
-  
+
   if (!inherits(sf_obj, "sf")) {
     stop("El objeto no es de clase 'sf'")
   }
-  
+
   tipo_geom <- st_geometry_type(sf_obj, by_geometry = FALSE)
   if (!tipo_geom %in% c("POLYGON", "MULTIPOLYGON")) {
     stop("El objeto debe ser de tipo POLYGON o MULTIPOLYGON")
   }
-  
-  if (point_on_surface) {
-    # Garantiza que el punto está dentro del polígono
-    centroides <- st_point_on_surface(sf_obj)
+
+  if (isTRUE(point_on_surface)) {
+    st_point_on_surface(sf_obj)
   } else {
-    # Centroide geométrico (puede estar fuera en polígonos cóncavos)
-    centroides <- st_centroid(sf_obj)
+    st_centroid(sf_obj)
   }
-  
-  return(centroides)
 }
 
 # -----------------------------------------------------------------------------
-# 7. FUNCIÓN: CREAR BUFFER CON VALIDACIÓN
+# 7. CREAR BUFFER CON VALIDACIÓN
 # -----------------------------------------------------------------------------
 
 #' Crea buffers con validación de CRS
-#' 
+#'
 #' @param sf_obj Objeto sf
 #' @param distancia Distancia del buffer
 #' @param unidad Unidad de distancia ("m", "km", etc.) - solo para verificación
@@ -299,178 +306,181 @@ calcular_centroides <- function(sf_obj, point_on_surface = FALSE) {
 #' @examples
 #' buffers <- crear_buffer(hospitales_utm, 500, "m")
 crear_buffer <- function(sf_obj, distancia, unidad = "m", disolver = FALSE) {
-  
+
   if (!inherits(sf_obj, "sf")) {
     stop("El objeto no es de clase 'sf'")
   }
-  
-  # Verificar que el CRS sea proyectado
+
+  # CRS proyectado
   if (st_is_longlat(sf_obj)) {
-    stop("El CRS debe ser proyectado (en metros) para crear buffers. 
-         Usar st_transform() primero.")
+    stop(
+      "El CRS debe ser proyectado (en metros) para crear buffers.\n",
+      "Usa st_transform() primero."
+    )
   }
-  
-  # Verificar unidades del CRS
+
+  # Unidades CRS
   crs_units <- st_crs(sf_obj)$units
   if (!is.null(crs_units) && crs_units != unidad) {
-    warning(paste0("Las unidades del CRS (", crs_units, 
-                  ") no coinciden con las especificadas (", unidad, ")"))
+    warning(
+      paste0(
+        "Las unidades del CRS (", crs_units,
+        ") no coinciden con las especificadas (", unidad, ")"
+      )
+    )
   }
-  
-  # Crear buffers
+
   cat("→ Creando buffers de", distancia, unidad, "...\n")
   buffers <- st_buffer(sf_obj, dist = distancia)
-  
-  # Disolver si se solicita
-  if (disolver) {
+
+  if (isTRUE(disolver)) {
     cat("  → Disolviendo buffers superpuestos...\n")
     buffers <- st_union(buffers) %>%
       st_sf(geometry = .)
   }
-  
+
   cat("✓ Buffers creados:", nrow(buffers), "geometrías\n")
-  
-  return(buffers)
+  buffers
 }
 
 # -----------------------------------------------------------------------------
-# 8. FUNCIÓN: COMPARAR DOS OBJETOS SF
+# 8. COMPARAR DOS OBJETOS SF
 # -----------------------------------------------------------------------------
 
 #' Compara dos objetos sf para verificar compatibilidad
-#' 
+#'
 #' @param sf_obj1 Primer objeto sf
 #' @param sf_obj2 Segundo objeto sf
 #' @param nombre1 Nombre del primer objeto (para reportes)
 #' @param nombre2 Nombre del segundo objeto (para reportes)
-#' @return Lista con resultados de comparación
+#' @return Lista con resultados de comparación (invisible)
 #' @examples
 #' comparar_sf(poligonos, hospitales, "Polígonos", "Hospitales")
-comparar_sf <- function(sf_obj1, sf_obj2, nombre1 = "Objeto 1", nombre2 = "Objeto 2") {
-  
+comparar_sf <- function(sf_obj1,
+                        sf_obj2,
+                        nombre1 = "Objeto 1",
+                        nombre2 = "Objeto 2") {
+
   cat("\n", rep("=", 60), "\n", sep = "")
   cat("COMPARACIÓN:", nombre1, "vs", nombre2, "\n")
   cat(rep("=", 60), "\n\n", sep = "")
-  
+
   # CRS
   crs1 <- st_crs(sf_obj1)
   crs2 <- st_crs(sf_obj2)
   mismo_crs <- crs1 == crs2
-  
+
   cat("🌍 SISTEMA DE COORDENADAS:\n")
   cat("  -", nombre1, ":", crs1$input, "\n")
   cat("  -", nombre2, ":", crs2$input, "\n")
   cat("  - ¿Mismo CRS?:", ifelse(mismo_crs, "✓ Sí", "✗ No"), "\n")
-  
-  # Bounding boxes
+
+  # BBox
   bbox1 <- st_bbox(sf_obj1)
   bbox2 <- st_bbox(sf_obj2)
-  
+
   cat("\n📍 COBERTURA ESPACIAL:\n")
-  cat("  -", nombre1, "BBox: [", 
-      paste(round(bbox1, 2), collapse = ", "), "]\n")
-  cat("  -", nombre2, "BBox: [", 
-      paste(round(bbox2, 2), collapse = ", "), "]\n")
-  
-  # Intersección de bboxes
+  cat("  -", nombre1, "BBox: [", paste(round(bbox1, 2), collapse = ", "), "]\n")
+  cat("  -", nombre2, "BBox: [", paste(round(bbox2, 2), collapse = ", "), "]\n")
+
+  # Intersección BBox
   if (mismo_crs) {
-    intersecta <- !(bbox1["xmax"] < bbox2["xmin"] || 
-                   bbox1["xmin"] > bbox2["xmax"] ||
-                   bbox1["ymax"] < bbox2["ymin"] || 
-                   bbox1["ymin"] > bbox2["ymax"])
+    intersecta <- !(
+      bbox1["xmax"] < bbox2["xmin"] ||
+        bbox1["xmin"] > bbox2["xmax"] ||
+        bbox1["ymax"] < bbox2["ymin"] ||
+        bbox1["ymin"] > bbox2["ymax"]
+    )
     cat("  - ¿BBoxes se intersectan?:", ifelse(intersecta, "✓ Sí", "✗ No"), "\n")
   } else {
+    intersecta <- NA
     cat("  - No se puede verificar intersección (CRS diferentes)\n")
   }
-  
-  # Tipos de geometría
+
+  # Tipo geometría
   tipo1 <- st_geometry_type(sf_obj1, by_geometry = FALSE)
   tipo2 <- st_geometry_type(sf_obj2, by_geometry = FALSE)
-  
+
   cat("\n📐 GEOMETRÍA:\n")
   cat("  -", nombre1, ":", tipo1, "\n")
   cat("  -", nombre2, ":", tipo2, "\n")
-  
+
   cat("\n", rep("=", 60), "\n\n", sep = "")
-  
-  # Devolver resultados como lista
-  resultado <- list(
+
+  invisible(list(
     mismo_crs = mismo_crs,
     crs1 = crs1$input,
     crs2 = crs2$input,
-    bbox_intersecta = if(mismo_crs) intersecta else NA,
+    bbox_intersecta = intersecta,
     tipo1 = tipo1,
     tipo2 = tipo2
-  )
-  
-  return(invisible(resultado))
+  ))
 }
 
 # -----------------------------------------------------------------------------
-# 9. FUNCIÓN: EXPORTAR MÚLTIPLES FORMATOS
+# 9. EXPORTAR A MÚLTIPLES FORMATOS
 # -----------------------------------------------------------------------------
 
 #' Exporta objeto sf a múltiples formatos
-#' 
+#'
 #' @param sf_obj Objeto sf a exportar
 #' @param nombre Nombre base del archivo
 #' @param directorio Directorio de salida (default "data")
 #' @param formatos Vector de formatos (default c("shp", "geojson"))
-#' @return Vector de paths de archivos creados
+#' @return Vector de paths de archivos creados (invisible)
 #' @examples
-#' exportar_sf(poligonos_limpios, "poligonos_final", formatos = c("shp", "geojson", "gpkg"))
-exportar_sf <- function(sf_obj, nombre, directorio = "data", 
+#' exportar_sf(poligonos_limpios, "poligonos_final",
+#'             formatos = c("shp", "geojson", "gpkg"))
+exportar_sf <- function(sf_obj,
+                        nombre,
+                        directorio = "data",
                         formatos = c("shp", "geojson")) {
-  
+
   if (!inherits(sf_obj, "sf")) {
     stop("El objeto no es de clase 'sf'")
   }
-  
-  # Crear directorio si no existe
-  if (!dir.exists(directorio)) {
-    dir.create(directorio, recursive = TRUE)
-  }
-  
-  paths_creados <- c()
-  
+
+  if (!dir.exists(directorio)) dir.create(directorio, recursive = TRUE)
+
+  paths_creados <- character(0)
+
   for (formato in formatos) {
-    
+
     if (formato == "shp") {
       path <- file.path(directorio, paste0(nombre, ".shp"))
       st_write(sf_obj, path, delete_dsn = TRUE, quiet = TRUE)
-      
+
     } else if (formato == "geojson") {
       path <- file.path(directorio, paste0(nombre, ".geojson"))
       st_write(sf_obj, path, delete_dsn = TRUE, quiet = TRUE)
-      
+
     } else if (formato == "gpkg") {
       path <- file.path(directorio, paste0(nombre, ".gpkg"))
       st_write(sf_obj, path, delete_dsn = TRUE, quiet = TRUE)
-      
+
     } else if (formato == "csv") {
-      # Exportar como CSV (sin geometría, solo atributos)
       path <- file.path(directorio, paste0(nombre, ".csv"))
       df <- sf_obj %>% st_drop_geometry()
       write.csv(df, path, row.names = FALSE)
-      
+
     } else {
       warning(paste("Formato no soportado:", formato))
       next
     }
-    
+
     cat("✓ Exportado:", path, "\n")
     paths_creados <- c(paths_creados, path)
   }
-  
-  return(invisible(paths_creados))
+
+  invisible(paths_creados)
 }
 
 # -----------------------------------------------------------------------------
-# 10. FUNCIÓN: RESUMEN ESTADÍSTICO ESPACIAL
+# 10. RESUMEN ESTADÍSTICO ESPACIAL
 # -----------------------------------------------------------------------------
 
 #' Genera resumen estadístico de una variable por unidad espacial
-#' 
+#'
 #' @param sf_obj Objeto sf
 #' @param variable Nombre de la variable a resumir
 #' @param agrupar_por Columna por la cual agrupar (opcional)
@@ -478,20 +488,20 @@ exportar_sf <- function(sf_obj, nombre, directorio = "data",
 #' @examples
 #' resumen_estadistico(eventos_con_zona, "severidad", "zona_nombre")
 resumen_estadistico <- function(sf_obj, variable, agrupar_por = NULL) {
-  
+
   if (!inherits(sf_obj, "sf")) {
     stop("El objeto no es de clase 'sf'")
   }
-  
+
   if (!variable %in% names(sf_obj)) {
     stop(paste("La variable", variable, "no existe en el objeto"))
   }
-  
+
   df <- sf_obj %>% st_drop_geometry()
-  
+
   if (is.null(agrupar_por)) {
-    # Resumen global
-    resumen <- df %>%
+
+    df %>%
       summarise(
         n = n(),
         media = mean(.data[[variable]], na.rm = TRUE),
@@ -503,13 +513,14 @@ resumen_estadistico <- function(sf_obj, variable, agrupar_por = NULL) {
         q75 = quantile(.data[[variable]], 0.75, na.rm = TRUE),
         n_na = sum(is.na(.data[[variable]]))
       )
+
   } else {
-    # Resumen por grupo
+
     if (!agrupar_por %in% names(df)) {
       stop(paste("La columna", agrupar_por, "no existe en el objeto"))
     }
-    
-    resumen <- df %>%
+
+    df %>%
       group_by(.data[[agrupar_por]]) %>%
       summarise(
         n = n(),
@@ -522,8 +533,6 @@ resumen_estadistico <- function(sf_obj, variable, agrupar_por = NULL) {
         .groups = "drop"
       )
   }
-  
-  return(resumen)
 }
 
 # -----------------------------------------------------------------------------
@@ -542,4 +551,4 @@ cat("  7. crear_buffer() - Buffers con validación\n")
 cat("  8. comparar_sf() - Comparar dos objetos sf\n")
 cat("  9. exportar_sf() - Exportar a múltiples formatos\n")
 cat("  10. resumen_estadistico() - Estadísticas por grupo\n")
-cat("\nUso: Cargar con source('scripts/99_helpers_optional.R')\n\n")
+cat("\nUso: source('scripts/99_helpers_optional.R')\n\n")
