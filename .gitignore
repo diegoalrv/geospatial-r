@@ -1,0 +1,7 @@
+/datos
+/data
+/outputs
+/cache
+.RData
+.Rhistory
+*.ipynb
